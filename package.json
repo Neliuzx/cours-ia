@@ -1,0 +1,24 @@
+{
+    "type": "module",
+    "dev": "node --watch --env-file=.env server.js",
+    "name": "cours-ia",
+    "version": "1.0.0",
+    "description": "",
+    "main": "server.js",
+    "scripts": {
+        "dev": "node --watch --env-file=.env server.js",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node server.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Neliuzx/cours-ia.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/Neliuzx/cours-ia/issues"
+    },
+    "homepage": "https://github.com/Neliuzx/cours-ia#readme"
+}
