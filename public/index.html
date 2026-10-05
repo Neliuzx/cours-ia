@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,15 +8,17 @@
     <script src="./app.js" defer></script>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-send">
+    <header class="chat-header">
+        <h1>Chat avec Gemini</h1>
+    </header>
 
-        </div>
-        <div class="chat-received">
-        </div>
-    </div>
-    <div class="chat-input-container">
-        <input type="text" class="chat-input">
-    </div>
+    <main class="chat-container" id="messages">
+        <div class="bot">Bonjour ! Comment puis-je vous aider aujourd'hui ?</div>
+    </main>
+
+    <form class="chat-input-container" id="chat-form">
+        <input type="text" class="chat-input" id="chat-input" autocomplete="off" required>
+        <button type="submit" class="chat-send-button" id="chat-send-button">Envoyer</button>
+    </form>
 </body>
 </html>

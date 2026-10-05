@@ -2,10 +2,10 @@ import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-const GEMINI_MODEL = 'gemini-3.8-flash'   // à choisir dans Google AI Studio
+const GEMINI_API_KEY = process.env.API_KEY
+const GEMINI_MODEL = 'gemini-3.8-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
-const GEMINI_TIMEOUT = 15_000   // en millisecondes
+const GEMINI_TIMEOUT = 15_000
 const PUBLIC_DIR = path.resolve('public')
 const PORT = 3000
 const MAX_BODY_SIZE = 10000
@@ -37,12 +37,14 @@ async function askGemini(text) {
         signal: AbortSignal.timeout(GEMINI_TIMEOUT)
     })
     if (!response.ok) {
-        throw new Error(response.status)
+        const details = await response.text()
+        throw new Error(`Gemini a répondu ${response.status} : ${details}`)
     }
     const data = await response.json()
     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
 
     if (typeof reply !== 'string') {
+
         throw new Error('Mauvais format')
     }
     return reply
