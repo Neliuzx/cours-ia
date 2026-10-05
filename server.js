@@ -2,6 +2,10 @@ import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+const GEMINI_MODEL = 'gemini-3.8-flash'   // à choisir dans Google AI Studio
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+const GEMINI_TIMEOUT = 15_000   // en millisecondes
 const PUBLIC_DIR = path.resolve('public')
 const PORT = 3000
 const MAX_BODY_SIZE = 10000
@@ -15,6 +19,34 @@ const MIME_TYPES = {
 }
 
 
+if (!GEMINI_API_KEY) {
+    console.error('API Key introuvable')
+    process.exit(1)
+}
+
+async function askGemini(text) {
+    const response = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: text }] }]
+        }),
+        signal: AbortSignal.timeout(GEMINI_TIMEOUT)
+    })
+    if (!response.ok) {
+        throw new Error(response.status)
+    }
+    const data = await response.json()
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
+
+    if (typeof reply !== 'string') {
+        throw new Error('Mauvais format')
+    }
+    return reply
+}
 function readBody(req) {
     return new Promise((resolve, reject) => {
         const chunks = []
@@ -51,14 +83,23 @@ async function handleChat(req, res) {
     if (typeof message !== 'string') {
         return sendJson(res, 400, { 'error': 'Le message doit etre une string' })
     }
-    if (message.trim().length === 0) {
+    const text = message.trim()
+    if (text.length === 0) {
         return sendJson(res, 400, { 'error': 'Le message est vide' })
-    }
-    if (message.trim().length > MAX_MESSAGE_LENGTH) {
+    } else if (text.length > MAX_MESSAGE_LENGTH) {
         return sendJson(res, 400, { 'error': 'Le message est trop long' })
     }
+    try {
+        const reply = await askGemini(text)
+        return sendJson(res, 200, { reply })
+    } catch (err) {
+        console.error(err)
+        if (err.name === 'TimeoutError') {
+            return sendJson(res, 504, { 'error': 'Timeout Error' })
+        }
+        sendJson(res, 502, { 'error': 'Erreur' })
 
-    sendJson(res, 200, { 'reply': message })
+    }
 
 }
 
