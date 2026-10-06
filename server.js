@@ -3,9 +3,9 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const GEMINI_API_KEY = process.env.API_KEY
-const GEMINI_MODEL = 'gemini-3.8-flash'
+const GEMINI_MODEL = 'gemini-3.1-flash-lite'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
-const GEMINI_TIMEOUT = 15_000
+const GEMINI_TIMEOUT = 60_000
 const PUBLIC_DIR = path.resolve('public')
 const PORT = 3000
 const MAX_BODY_SIZE = 10000
@@ -72,7 +72,6 @@ function readBody(req) {
 }
 
 async function handleChat(req, res) {
-
     const string = await readBody(req)
     let data
     try {
@@ -145,8 +144,6 @@ async function serveStatic(res, pathname) {
         throw err
     }
 }
-
-
 
 const server = http.createServer(async (req, res) => {
 
