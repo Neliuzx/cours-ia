@@ -8,9 +8,10 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 const GEMINI_TIMEOUT = 60_000
 const PUBLIC_DIR = path.resolve('public')
 const PORT = 3000
-const MAX_BODY_SIZE = 10000
-const MAX_MESSAGE_LENGTH = 2000
-
+const MAX_BODY_SIZE = 50000
+const MAX_MESSAGE_LENGTH = 7000
+const MAX_HISTORY = 20
+const ALLOWED_ROLES = ['user', 'model']
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -24,16 +25,35 @@ if (!GEMINI_API_KEY) {
     process.exit(1)
 }
 
-async function askGemini(text) {
+function isValidHistory(history) {
+
+    if (!Array.isArray(history)) {
+        return false
+    }
+    if (history.length > MAX_HISTORY) {
+        return false
+    }
+
+    return history.every((msg) => {
+        const role = msg?.role
+        const text = msg?.text
+        return ALLOWED_ROLES.includes(role) && typeof text === 'string' && text.trim().length > 0 && text.length <= MAX_MESSAGE_LENGTH
+    })
+
+}
+
+async function askGemini(history, text) {
+    const contents = [
+        ...history.map((msg) => ({ role: msg.role, parts: [{ text: msg.text }] })),
+        { role: 'user', parts: [{ text }] }
+    ]
     const response = await fetch(GEMINI_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'x-goog-api-key': GEMINI_API_KEY
         },
-        body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: text }] }]
-        }),
+        body: JSON.stringify({ contents }),
         signal: AbortSignal.timeout(GEMINI_TIMEOUT)
     })
     if (!response.ok) {
@@ -74,6 +94,7 @@ function readBody(req) {
 async function handleChat(req, res) {
     const string = await readBody(req)
     let data
+    
     try {
         data = JSON.parse(string)
     } catch {
@@ -84,6 +105,10 @@ async function handleChat(req, res) {
     if (typeof message !== 'string') {
         return sendJson(res, 400, { 'error': 'Le message doit etre une string' })
     }
+    const history = data?.history ?? []
+    if (!isValidHistory(history)) {
+        return sendJson(res, 400, { error: "Erreur dans l'historique des messages" })
+    }
     const text = message.trim()
     if (text.length === 0) {
         return sendJson(res, 400, { 'error': 'Le message est vide' })
@@ -91,7 +116,7 @@ async function handleChat(req, res) {
         return sendJson(res, 400, { 'error': 'Le message est trop long' })
     }
     try {
-        const reply = await askGemini(text)
+        const reply = await askGemini(history, text)
         return sendJson(res, 200, { reply })
     } catch (err) {
         console.error(err)
@@ -175,5 +200,5 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, () => {
-    console.log(`Port : http://localhost:${PORT}`)
+    console.log(`http://localhost:${PORT}`)
 })
