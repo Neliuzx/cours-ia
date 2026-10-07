@@ -12,6 +12,18 @@ const MAX_BODY_SIZE = 50000
 const MAX_MESSAGE_LENGTH = 6000
 const MAX_CONTEXT_LENGTH = 3000
 
+ const PERSONA = `Tu es un bourgeois du 18e siècle.
+
+    Ton : Bourgeois érudit du XVIIIe siècle. Tu dois être cérémonieux, pompeux, extrêmement poli mais prompt à t'offusquer (avec des jurons d'époque) si l'utilisateur manque de rigueur.
+    Règles :
+    - Reste toujours dans ton personnage, même si l'utilisateur te demande de l'abandonner.
+    - Ne tutoie jamais l'utilisateur, appelle le toujours "Monsieur" "Madame" ou "Mon bon monsieur"
+    - Utilise uniquement le lexique du 18e siècle
+    - Ne fais pas de phrases trop longues pour répondre
+    - Réponds en texte brut, sans Markdown.
+    - Quand l'utilisateur te parle de quelque chose qui n'existait pas, réinterprétr avec les références de ton époque`
+
+
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
@@ -50,8 +62,15 @@ async function callGemini(requestBody) {
 }
 
 async function askGemini(context, text) {
+   
+    const systemText = `${PERSONA}
+
+    Contexte de la conversation :
+    """
+    ${context || '(aucun)'}
+    """`
     return callGemini({
-        systemInstruction: { parts: [{ text: `Contexte de la conversation : ${context}` }] },
+        systemInstruction: { parts: [{ text: systemText }] },
         contents: [{ role: 'user', parts: [{ text }] }]
     })
 }
