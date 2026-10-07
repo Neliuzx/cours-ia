@@ -9,7 +9,7 @@ const GEMINI_TIMEOUT = 60_000
 const PUBLIC_DIR = path.resolve('public')
 const PORT = 3000
 const MAX_BODY_SIZE = 50000
-const MAX_MESSAGE_LENGTH = 7000
+const MAX_MESSAGE_LENGTH = 6000
 const MAX_HISTORY = 20
 const ALLOWED_ROLES = ['user', 'model']
 
