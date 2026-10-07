@@ -5,13 +5,12 @@ import path from 'node:path'
 const GEMINI_API_KEY = process.env.API_KEY
 const GEMINI_MODEL = 'gemini-3.1-flash-lite'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
-const GEMINI_TIMEOUT = 60_000
+const GEMINI_TIMEOUT = 60000
 const PUBLIC_DIR = path.resolve('public')
 const PORT = 3000
 const MAX_BODY_SIZE = 50000
 const MAX_MESSAGE_LENGTH = 6000
-const MAX_HISTORY = 20
-const ALLOWED_ROLES = ['user', 'model']
+const MAX_CONTEXT_LENGTH = 3000
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -25,35 +24,14 @@ if (!GEMINI_API_KEY) {
     process.exit(1)
 }
 
-function isValidHistory(history) {
-
-    if (!Array.isArray(history)) {
-        return false
-    }
-    if (history.length > MAX_HISTORY) {
-        return false
-    }
-
-    return history.every((msg) => {
-        const role = msg?.role
-        const text = msg?.text
-        return ALLOWED_ROLES.includes(role) && typeof text === 'string' && text.trim().length > 0 && text.length <= MAX_MESSAGE_LENGTH
-    })
-
-}
-
-async function askGemini(history, text) {
-    const contents = [
-        ...history.map((msg) => ({ role: msg.role, parts: [{ text: msg.text }] })),
-        { role: 'user', parts: [{ text }] }
-    ]
+async function callGemini(requestBody) {
     const response = await fetch(GEMINI_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'x-goog-api-key': GEMINI_API_KEY
         },
-        body: JSON.stringify({ contents }),
+        body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(GEMINI_TIMEOUT)
     })
     if (!response.ok) {
@@ -68,7 +46,41 @@ async function askGemini(history, text) {
         throw new Error('Mauvais format')
     }
     return reply
+
 }
+
+async function askGemini(context, text) {
+    return callGemini({
+        systemInstruction: { parts: [{ text: `Contexte de la conversation : ${context}` }] },
+        contents: [{ role: 'user', parts: [{ text }] }]
+    })
+}
+
+async function updateContext(context, userText, reply) {
+    const prompt = `Tu mets e jour le contexte d'une conversation entre un utilisateur et un assistant.
+
+Règles :
+- Garde uniquement les informations utiles à la discussion (nom, préférences, projet etc..)
+- Ignore les informations inutiles (comme les formules de politesse et les détails sans importances)
+- Ne renvoie que quelques phrases maximum, à la 3 eme personne et au format texte brut (pas de markdown)
+- Réponds uniquement avec le nouveau contexte, sans introduction
+
+Contexte actuel :
+"""
+${context || '(aucun)'}
+"""
+
+Nouvel échange :
+Utilisateur : """${userText}"""
+Assistant : """${reply}"""`
+
+    return callGemini({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 300 }
+    })
+}
+
+
 function readBody(req) {
     return new Promise((resolve, reject) => {
         const chunks = []
@@ -94,7 +106,7 @@ function readBody(req) {
 async function handleChat(req, res) {
     const string = await readBody(req)
     let data
-    
+
     try {
         data = JSON.parse(string)
     } catch {
@@ -105,27 +117,34 @@ async function handleChat(req, res) {
     if (typeof message !== 'string') {
         return sendJson(res, 400, { 'error': 'Le message doit etre une string' })
     }
-    const history = data?.history ?? []
-    if (!isValidHistory(history)) {
-        return sendJson(res, 400, { error: "Erreur dans l'historique des messages" })
-    }
     const text = message.trim()
     if (text.length === 0) {
         return sendJson(res, 400, { 'error': 'Le message est vide' })
     } else if (text.length > MAX_MESSAGE_LENGTH) {
         return sendJson(res, 400, { 'error': 'Le message est trop long' })
     }
+    const context = data?.context ?? ''
+    if (typeof context !== 'string' || context.length > MAX_CONTEXT_LENGTH) {
+        return sendJson(res, 400, { error: 'Contexte invalide' })
+    }
+    let reply
     try {
-        const reply = await askGemini(history, text)
-        return sendJson(res, 200, { reply })
+        reply = await askGemini(context, text)
     } catch (err) {
         console.error(err)
         if (err.name === 'TimeoutError') {
             return sendJson(res, 504, { 'error': 'Timeout Error' })
         }
-        sendJson(res, 502, { 'error': 'Erreur' })
-
+        return sendJson(res, 502, { 'error': 'Erreur' })
     }
+    let newContext = context
+    try {
+        newContext = await updateContext(context, text, reply)
+    } catch (err) {
+        console.error(err)
+    }
+
+    return sendJson(res, 200, { reply, context: newContext })
 
 }
 
