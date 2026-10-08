@@ -49,4 +49,3 @@ function buildMessage(vault) {
         .join('\n')
 }
 
-console.log(loadVault().index)
